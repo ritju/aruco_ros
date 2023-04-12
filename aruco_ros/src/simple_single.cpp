@@ -151,10 +151,9 @@ public:
     RCLCPP_INFO_STREAM(
       this->get_logger(), "Marker size min: " << min_marker_size << " of image area");
     RCLCPP_INFO_STREAM(this->get_logger(), "Detection mode: " << detection_mode);
-
     image_sub = it_->subscribe("/image", 1, &ArucoSimple::image_callback, this);
     cam_info_sub = this->create_subscription<sensor_msgs::msg::CameraInfo>(
-      "/camera_info", 1, std::bind(
+      "/camera_info",  rclcpp::QoS{1}.best_effort(), std::bind(
         &ArucoSimple::cam_info_callback, this,
         std::placeholders::_1));
 

@@ -16,7 +16,8 @@ def launch_setup(context, *args, **kwargs):
         'marker_id2': LaunchConfiguration('marker_id2'),
         'normalizeImage': LaunchConfiguration('dct_normalization'),
         'dct_components_to_remove': LaunchConfiguration('dct_filter_size'),
-        'parent_name': 'stereo_gazebo_' + eye + '_camera_optical_frame',
+        # 'parent_name': 'stereo_gazebo_' + eye + '_camera_optical_frame',
+        'parent_name': 'camera_color_frame',
         'child_name1': LaunchConfiguration('marker1_frame'),
         'child_name2': LaunchConfiguration('marker2_frame'),
     }
@@ -25,8 +26,10 @@ def launch_setup(context, *args, **kwargs):
         package='aruco_ros',
         executable='double',
         parameters=[aruco_double_params],
-        remappings=[('/camera_info', '/stereo/' + eye + '/camera_info'),
-                    ('/image', '/stereo/' + eye + '/image_rect_color')],
+        # remappings=[('/camera_info', '/stereo/' + eye + '/camera_info'),
+        #             ('/image', '/stereo/' + eye + '/image_rect_color')],
+        remappings=[('/camera_info', '/camera/' + 'color' + '/camera_info'),
+                    ('/image', '/camera/' + 'color' + '/image_raw')],
     )
 
     return [aruco_double]
@@ -40,12 +43,12 @@ def generate_launch_description():
     )
 
     marker_id2_arg = DeclareLaunchArgument(
-        'marker_id2', default_value='26',
+        'marker_id2', default_value='656',
         description='Marker ID 2. '
     )
 
     marker_size_arg = DeclareLaunchArgument(
-        'marker_size', default_value='0.04',
+        'marker_size', default_value='0.133',
         description='Marker size in m. '
     )
 

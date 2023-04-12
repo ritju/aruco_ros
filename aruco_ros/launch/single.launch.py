@@ -14,7 +14,8 @@ def launch_setup(context, *args, **kwargs):
         'marker_size': LaunchConfiguration('marker_size'),
         'marker_id': LaunchConfiguration('marker_id'),
         'reference_frame': LaunchConfiguration('reference_frame'),
-        'camera_frame': 'stereo_gazebo_' + eye + '_camera_optical_frame',
+        # 'camera_frame': 'stereo_gazebo_' + eye + '_camera_optical_frame',
+        'camera_frame': 'camera_color_frame',
         'marker_frame': LaunchConfiguration('marker_frame'),
         'corner_refinement': LaunchConfiguration('corner_refinement'),
     }
@@ -23,8 +24,10 @@ def launch_setup(context, *args, **kwargs):
         package='aruco_ros',
         executable='single',
         parameters=[aruco_single_params],
-        remappings=[('/camera_info', '/stereo/' + eye + '/camera_info'),
-                    ('/image', '/stereo/' + eye + '/image_rect_color')],
+        # remappings=[('/camera_info', '/stereo/' + eye + '/camera_info'),
+        #             ('/image', '/stereo/' + eye + '/image_rect_color')],
+        remappings=[('/camera_info', '/camera/' + 'color' + '/camera_info'),
+                    ('/image', '/camera/' + 'color' + '/image_raw')],
     )
 
     return [aruco_single]
@@ -38,7 +41,7 @@ def generate_launch_description():
     )
 
     marker_size_arg = DeclareLaunchArgument(
-        'marker_size', default_value='0.34',
+        'marker_size', default_value='0.133',
         description='Marker size in m. '
     )
 
@@ -54,7 +57,7 @@ def generate_launch_description():
     )
 
     reference_frame = DeclareLaunchArgument(
-        'reference_frame', default_value='',
+        'reference_frame', default_value='camera_color_frame',
         description='Reference frame. '
         'Leave it empty and the pose will be published wrt param parent_name. '
     )

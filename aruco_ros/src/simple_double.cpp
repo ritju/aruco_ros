@@ -272,7 +272,7 @@ int main(int argc, char ** argv)
 
   image_transport::Subscriber image_sub = it.subscribe("/image", 1, &image_callback);
   cam_info_sub = node->create_subscription<sensor_msgs::msg::CameraInfo>(
-    "/camera_info", 1,
+    "/camera_info", rclcpp::QoS{1}.best_effort(),
     cam_info_callback);
 
   cam_info_received = false;

@@ -24,6 +24,7 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
     visualization_msgs
 )
 find_package(ament_cmake REQUIRED)
+set(image_transport_DIR "build/image_transport")
 foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
   find_package(${Dependency} REQUIRED)
 endforeach()
