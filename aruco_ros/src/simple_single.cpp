@@ -253,6 +253,9 @@ public:
             tf2::Transform transform = aruco_ros::arucoMarker2Tf2(markers[i]);
             tf2::Stamped<tf2::Transform> cameraToReference;
             cameraToReference.setIdentity();
+            tf2::Quaternion q;
+            q.setRPY(M_PI/2, 0.0, M_PI/2);
+            cameraToReference.setRotation(q);
 
             if (reference_frame != camera_frame) {
               geometry_msgs::msg::TransformStamped transform_stamped;

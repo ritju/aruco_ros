@@ -13,15 +13,17 @@ def launch_setup(context, *args, **kwargs):
         'image_is_rectified': True,
         'marker_size': LaunchConfiguration('marker_size'),
         'reference_frame': LaunchConfiguration('reference_frame'),
-        'camera_frame': side + '_hand_camera',
+        'camera_frame': "camera_link",
     }
 
     aruco_marker_publisher = Node(
         package='aruco_ros',
         executable='marker_publisher',
         parameters=[aruco_marker_publisher_params],
-        remappings=[('/camera_info', '/cameras/' + side + '_hand_camera/camera_info'),
-                    ('/image', '/cameras/' + side + '_hand_camera/image')],
+        # remappings=[('/camera_info', '/cameras/' + side + '_hand_camera/camera_info'),
+        #             ('/image', '/cameras/' + side + '_hand_camera/image')],
+        remappings=[('/camera_info', '/camera/' + 'color' + '/camera_info'),
+            ('/image', '/camera/' + 'color' + '/image_raw')],
     )
 
     return [aruco_marker_publisher]
@@ -30,7 +32,7 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
 
     marker_size_arg = DeclareLaunchArgument(
-        'marker_size', default_value='0.05',
+        'marker_size', default_value='0.100',
         description='Marker size in m. '
     )
 
