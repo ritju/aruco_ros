@@ -73,9 +73,7 @@ private:
   // rviz visualization marker
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub;
   rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr pixel_pub;
-  rclcpp::Publisher<capella_ros_service_interfaces::msg::ChargeMarkerVisible>::SharedPtr detect_status;
-  rclcpp::TimerBase::SharedPtr marker_visible;
-  
+  rclcpp::Publisher<capella_ros_service_interfaces::msg::ChargeMarkerVisible>::SharedPtr detect_status;  
   std::string marker_frame;
   std::string camera_frame;
   std::string reference_frame;
@@ -89,29 +87,12 @@ private:
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
-  void marker_visible_callback()
-  {
-    if (markers.size() == 0)
-          {
-            capella_ros_service_interfaces::msg::ChargeMarkerVisible marker_detect_status;
-            marker_detect_status.marker_visible = false;
-            detect_status->publish(marker_detect_status);
-          }
-          else if (markers.size() == 1)
-          {
-            capella_ros_service_interfaces::msg::ChargeMarkerVisible marker_detect_status;
-            marker_detect_status.marker_visible = true;
-            detect_status->publish(marker_detect_status);
-          }
-  }
+    
 
 public:
   ArucoSimple()
   : Node("aruco_single"), cam_info_received(false)
   {
-    detect_status = this->create_publisher<capella_ros_service_interfaces::msg::ChargeMarkerVisible>("marker_visible", 1);
-    marker_visible = this->create_wall_timer(std::chrono::milliseconds(50), std::bind(&ArucoSimple::marker_visible_callback, this));
-
   }
 
   bool setup()
@@ -187,6 +168,8 @@ public:
     position_pub = subNode->create_publisher<geometry_msgs::msg::Vector3Stamped>("position", 100);
     marker_pub = subNode->create_publisher<visualization_msgs::msg::Marker>("marker", 10);
     pixel_pub = subNode->create_publisher<geometry_msgs::msg::PointStamped>("pixel", 10);
+    detect_status = subNode->create_publisher<capella_ros_service_interfaces::msg::ChargeMarkerVisible>("marker_visible", 10);
+
 
     this->get_parameter_or<double>("marker_size", marker_size, 0.05);
     this->get_parameter_or<int>("marker_id", marker_id, 300);
@@ -254,7 +237,7 @@ public:
       (pixel_pub->get_subscription_count() == 0))
     {
       RCLCPP_DEBUG(this->get_logger(), "No subscribers, not looking for ArUco markers");
-      return;
+      // return;
     }
 
     if (cam_info_received) {
@@ -288,6 +271,19 @@ public:
             transform = static_cast<tf2::Transform>(cameraToReference) *
               static_cast<tf2::Transform>(rightToLeft) *
               transform;
+
+            if (markers.size() == 0)
+            {
+              capella_ros_service_interfaces::msg::ChargeMarkerVisible marker_detect_status;
+              marker_detect_status.marker_visible = false;
+              detect_status->publish(marker_detect_status);
+            }
+            else if (markers.size() > 0)
+            {
+              capella_ros_service_interfaces::msg::ChargeMarkerVisible marker_detect_status;
+              marker_detect_status.marker_visible = true;
+              detect_status->publish(marker_detect_status);
+            }
 
             geometry_msgs::msg::TransformStamped stampedTransform;
             stampedTransform.header.frame_id = reference_frame;
