@@ -73,7 +73,8 @@ private:
   // rviz visualization marker
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub;
   rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr pixel_pub;
-  rclcpp::Publisher<capella_ros_service_interfaces::msg::ChargeMarkerVisible>::SharedPtr detect_status;  
+  rclcpp::Publisher<capella_ros_service_interfaces::msg::ChargeMarkerVisible>::SharedPtr detect_status;
+  rclcpp::TimerBase::SharedPtr marker_timer;  
   std::string marker_frame;
   std::string camera_frame;
   std::string reference_frame;
@@ -87,6 +88,29 @@ private:
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+  void marker_timer_callback()
+  {
+    if (markers.size() == 0)
+    {
+      capella_ros_service_interfaces::msg::ChargeMarkerVisible marker_detect_status;
+      marker_detect_status.marker_visible = false;
+      detect_status->publish(marker_detect_status);
+    }
+    else if (markers.size() > 0)
+    {
+      for (int i = 0; i < markers.size(); i++)
+      {
+        if (markers[i].id == marker_id)
+        {
+          capella_ros_service_interfaces::msg::ChargeMarkerVisible marker_detect_status;
+          marker_detect_status.marker_visible = true;
+          detect_status->publish(marker_detect_status);
+        }
+      }
+    }
+
+    
+  }
     
 
 public:
@@ -168,7 +192,7 @@ public:
     position_pub = subNode->create_publisher<geometry_msgs::msg::Vector3Stamped>("position", 100);
     marker_pub = subNode->create_publisher<visualization_msgs::msg::Marker>("marker", 10);
     pixel_pub = subNode->create_publisher<geometry_msgs::msg::PointStamped>("pixel", 10);
-    detect_status = subNode->create_publisher<capella_ros_service_interfaces::msg::ChargeMarkerVisible>("marker_visible", 10);
+
 
 
     this->get_parameter_or<double>("marker_size", marker_size, 0.05);
@@ -177,6 +201,9 @@ public:
     this->get_parameter_or<std::string>("camera_frame", camera_frame, "");
     this->get_parameter_or<std::string>("marker_frame", marker_frame, "");
     this->get_parameter_or<bool>("image_is_rectified", useRectifiedImages, true);
+
+    detect_status = this->create_publisher<capella_ros_service_interfaces::msg::ChargeMarkerVisible>("marker_visible", 10);
+    marker_timer = this->create_wall_timer(std::chrono::milliseconds(50), std::bind(&ArucoSimple::marker_timer_callback, this));
 
     rcpputils::assert_true(
       camera_frame != "" && marker_frame != "",
@@ -272,19 +299,7 @@ public:
               static_cast<tf2::Transform>(rightToLeft) *
               transform;
 
-            if (markers.size() == 0)
-            {
-              capella_ros_service_interfaces::msg::ChargeMarkerVisible marker_detect_status;
-              marker_detect_status.marker_visible = false;
-              detect_status->publish(marker_detect_status);
-            }
-            else if (markers.size() > 0)
-            {
-              capella_ros_service_interfaces::msg::ChargeMarkerVisible marker_detect_status;
-              marker_detect_status.marker_visible = true;
-              detect_status->publish(marker_detect_status);
-            }
-
+            
             geometry_msgs::msg::TransformStamped stampedTransform;
             stampedTransform.header.frame_id = reference_frame;
             stampedTransform.header.stamp = curr_stamp;
