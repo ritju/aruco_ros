@@ -51,6 +51,7 @@
 #include "tf2_ros/transform_listener.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "visualization_msgs/msg/marker.hpp"
+#include "capella_ros_service_interfaces/msg/charge_marker_visible.hpp"
 
 class ArucoSimple : public rclcpp::Node
 {
@@ -72,6 +73,9 @@ private:
   // rviz visualization marker
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub;
   rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr pixel_pub;
+  rclcpp::Publisher<capella_ros_service_interfaces::msg::ChargeMarkerVisible>::SharedPtr detect_status;
+  rclcpp::TimerBase::SharedPtr marker_visible;
+  
   std::string marker_frame;
   std::string camera_frame;
   std::string reference_frame;
@@ -85,11 +89,29 @@ private:
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+  void marker_visible_callback()
+  {
+    if (markers.size() == 0)
+          {
+            capella_ros_service_interfaces::msg::ChargeMarkerVisible marker_detect_status;
+            marker_detect_status.marker_visible = false;
+            detect_status->publish(marker_detect_status);
+          }
+          else if (markers.size() == 1)
+          {
+            capella_ros_service_interfaces::msg::ChargeMarkerVisible marker_detect_status;
+            marker_detect_status.marker_visible = true;
+            detect_status->publish(marker_detect_status);
+          }
+  }
 
 public:
   ArucoSimple()
   : Node("aruco_single"), cam_info_received(false)
   {
+    detect_status = this->create_publisher<capella_ros_service_interfaces::msg::ChargeMarkerVisible>("marker_visible", 1);
+    marker_visible = this->create_wall_timer(std::chrono::milliseconds(50), std::bind(&ArucoSimple::marker_visible_callback, this));
+
   }
 
   bool setup()
@@ -312,6 +334,8 @@ public:
             visMarker.lifetime.sec = 3;
             marker_pub->publish(visMarker);
           }
+          
+          
           // but drawing all the detected markers
           markers[i].draw(inImage, cv::Scalar(0, 0, 255), 2);
         }

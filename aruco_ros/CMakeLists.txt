@@ -22,6 +22,7 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
     aruco_msgs
     sensor_msgs
     visualization_msgs
+    capella_ros_service_interfaces
 )
 find_package(ament_cmake REQUIRED)
 set(image_transport_DIR "build/image_transport")
