@@ -52,6 +52,9 @@
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "visualization_msgs/msg/marker.hpp"
 #include "capella_ros_service_interfaces/msg/charge_marker_visible.hpp"
+#include "Eigen/Dense"
+#include "nav_msgs/msg/odometry.hpp"
+
 
 class ArucoSimple : public rclcpp::Node
 {
@@ -64,6 +67,7 @@ private:
   aruco::MarkerDetector mDetector;
   std::vector<aruco::Marker> markers;
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr cam_info_sub;
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub;
   bool cam_info_received;
   image_transport::Publisher image_pub;
   image_transport::Publisher debug_pub;
@@ -88,7 +92,47 @@ private:
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
-  void marker_timer_callback()
+  double linear_x_;
+  double angular_z_;
+  rclcpp::Time vel_time_;
+  double intervel;
+  bool init_first_time;
+  int p_uncertain, r_uncertain;
+  bool odom_pub_;
+  struct kalman_info
+  {
+	Eigen::Vector4d kalman_output;  
+	Eigen::Matrix4d kalman_gain;   
+	Eigen::Matrix4d A;   
+  Eigen::Vector4d B;    
+	Eigen::Matrix4d H;   
+	Eigen::Matrix4d Q;   
+	Eigen::Matrix4d R;   
+	Eigen::Matrix4d P;   
+  double u;
+  };
+  kalman_info camera_pose_info;
+  void Init_kalman_info(kalman_info* info, double t, Eigen::Vector4d measurement)
+  {
+    info->A << 1,0,t,0, 0,1,0,t, 0,0,1,0, 0,0,0,1; 
+    info->B << pow(t, 2)/2, pow(t, 2)/2, t, t;
+    info->Q << pow(t, 2)/4,0,pow(t, 3)/2,0, 0,pow(t, 2)/4,0,pow(t, 3)/2, pow(t, 3)/2,0,pow(t, 2),0, 0,pow(t, 3)/2,0,pow(t, 2); //预测方差
+    if (init_first_time)
+    {
+      info->P.Identity();  //后验状态估计值方差的初值
+      info->P *= p_uncertain;
+      info->R << 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1; //观测噪声方差
+      info->R *= r_uncertain;
+      info->H << 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1;
+      info->kalman_output << measurement;
+      init_first_time = false;
+      // 测量的初始值
+      info->u = 1e-3;
+    }
+     
+  }
+
+  void marker_visible_callback()
   {
     if (markers.size() == 0)
     {
@@ -111,12 +155,27 @@ private:
 
     
   }
-    
+  void odom_callback(const nav_msgs::msg::Odometry &odom_sub)
+  {
+    linear_x_ = odom_sub.twist.twist.linear.x;
+    angular_z_ = odom_sub.twist.twist.angular.z;
+    vel_time_ = odom_sub.header.stamp;
+    odom_pub_ = true;
+  }
+  
+  
 
 public:
   ArucoSimple()
   : Node("aruco_single"), cam_info_received(false)
   {
+    detect_status = this->create_publisher<capella_ros_service_interfaces::msg::ChargeMarkerVisible>("marker_visible", 1);
+    marker_visible = this->create_wall_timer(std::chrono::milliseconds(50), std::bind(&ArucoSimple::marker_visible_callback, this));
+    linear_x_ = 0;
+    angular_z_ = 0;
+    intervel = 0.1;
+    init_first_time = true;
+    odom_pub_ = false;
   }
 
   bool setup()
@@ -161,6 +220,13 @@ public:
     this->declare_parameter<float>("min_marker_size", 0.02);
     this->declare_parameter<std::string>("detection_mode", "");
 
+    this->declare_parameter<int>("P_uncertain", 1);
+    this->declare_parameter<int>("R_uncertain", 1);
+
+    
+    this->get_parameter_or<int>("P_uncertain", p_uncertain, 1);
+    this->get_parameter_or<int>("R_uncertain", r_uncertain, 1);
+
     float min_marker_size;  // percentage of image area
     this->get_parameter_or<float>("min_marker_size", min_marker_size, 0.02);
 
@@ -183,6 +249,8 @@ public:
       "/camera_info",  rclcpp::QoS{1}.best_effort(), std::bind(
         &ArucoSimple::cam_info_callback, this,
         std::placeholders::_1));
+
+    odom_sub = this->create_subscription<nav_msgs::msg::Odometry>("odom", 1, std::bind(&ArucoSimple::odom_callback, this, std::placeholders::_1));
 
     image_pub = it_->advertise(this->get_name() + std::string("/result"), 1);
     debug_pub = it_->advertise(this->get_name() + std::string("/debug"), 1);
@@ -253,6 +321,21 @@ public:
     return true;
   }
 
+  void kalman_filter(kalman_info* kalman_info, Eigen::Vector4d last_measurement)
+  {
+    //预测下一时刻的值
+    auto predict_value = kalman_info->A * kalman_info->kalman_output + kalman_info->B * kalman_info->u;   //x的先验估计由上一个时间点的后验估计值和输入信息给出，此处需要根据基站高度做一个修改
+    
+    //求协方差
+    kalman_info->P = kalman_info->A * kalman_info->P * kalman_info->A.transpose() + kalman_info->Q;  //计算先验均方差 p(n|n-1)=A^2*p(n-1|n-1)+q  
+    //计算kalman增益
+    kalman_info->kalman_gain = kalman_info->P * kalman_info->H.transpose() * (kalman_info->H * kalman_info->P * kalman_info->H.transpose() + kalman_info->R).inverse();  //Kg(k)= P(k|k-1) H’ / (H P(k|k-1) H’ + R)
+    //修正结果，即计算滤波值
+    kalman_info->kalman_output = predict_value + kalman_info->kalman_gain * (last_measurement - kalman_info->H * predict_value);  //利用残余的信息改善对x(t)的估计，给出后验估计，这个值也就是输出  X(k|k)= X(k|k-1)+Kg(k) (Z(k)-H X(k|k-1))
+    //更新后验估计
+    kalman_info->P = (kalman_info->P - kalman_info->kalman_gain * kalman_info->H) * kalman_info->P;//计算后验均方差  P[n|n]=(1-K[n]*H)*P[n|n-1]
+  }
+
   void image_callback(const sensor_msgs::msg::Image::ConstSharedPtr & msg)
   {
     if ((image_pub.getNumSubscribers() == 0) &&
@@ -298,7 +381,23 @@ public:
             transform = static_cast<tf2::Transform>(cameraToReference) *
               static_cast<tf2::Transform>(rightToLeft) *
               transform;
-
+            
+            if (odom_pub_)
+            {
+              intervel = (rclcpp::Clock().now().seconds() - vel_time_.seconds());
+              Eigen::Vector4d pose_and_vel_mea;
+              pose_and_vel_mea << transform.getOrigin()[0], transform.getRotation()[2], linear_x_, angular_z_;
+              Init_kalman_info(&camera_pose_info, intervel, pose_and_vel_mea);
+              kalman_filter(&camera_pose_info, pose_and_vel_mea);
+              transform.getOrigin()[0] = camera_pose_info.kalman_output[0];
+              transform.getRotation()[2] = camera_pose_info.kalman_output[1];
+              odom_pub_ = false;
+            }
+            else
+            {
+              RCLCPP_WARN(this->get_logger(), "No odom pose and vel received");
+            }
+            
             
             geometry_msgs::msg::TransformStamped stampedTransform;
             stampedTransform.header.frame_id = reference_frame;

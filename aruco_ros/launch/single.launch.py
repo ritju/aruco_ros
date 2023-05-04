@@ -17,7 +17,8 @@ def launch_setup(context, *args, **kwargs):
         # 'camera_frame': 'stereo_gazebo_' + eye + '_camera_optical_frame',
         'camera_frame': 'camera_link',
         'marker_frame': LaunchConfiguration('marker_frame'),
-        'corner_refinement': LaunchConfiguration('corner_refinement'),
+        'P_uncertain': LaunchConfiguration('P_uncertain'),
+        'R_uncertain': LaunchConfiguration('R_uncertain'),
     }
 
     aruco_single = Node(
@@ -68,6 +69,17 @@ def generate_launch_description():
         choices=['NONE', 'HARRIS', 'LINES', 'SUBPIX'],
     )
 
+    R_uncertain_arg = DeclareLaunchArgument(
+        'R_uncertain', default_value='1',
+        description='R_uncertain',
+    )
+
+    P_uncertain_arg = DeclareLaunchArgument(
+        'P_uncertain', default_value='1',
+        description='P_uncertain',
+    )
+
+
     # Create the launch description and populate
     ld = LaunchDescription()
 
@@ -77,6 +89,8 @@ def generate_launch_description():
     ld.add_action(marker_frame_arg)
     ld.add_action(reference_frame)
     ld.add_action(corner_refinement_arg)
+    ld.add_action(P_uncertain_arg)
+    ld.add_action(R_uncertain_arg)
 
     ld.add_action(OpaqueFunction(function=launch_setup))
 
