@@ -42,7 +42,7 @@ def generate_launch_description():
     )
 
     marker_size_arg = DeclareLaunchArgument(
-        'marker_size', default_value='0.2',
+        'marker_size', default_value='0.20',
         description='Marker size in m. '
     )
 
@@ -70,12 +70,16 @@ def generate_launch_description():
     )
 
     R_uncertain_arg = DeclareLaunchArgument(
-        'R_uncertain', default_value='1',
+        'R_uncertain', default_value='50.0',
         description='R_uncertain',
+    )
+    Q_uncertain_arg = DeclareLaunchArgument(
+        'Q_uncertain', default_value='0.00001',
+        description='Q_uncertain',
     )
 
     P_uncertain_arg = DeclareLaunchArgument(
-        'P_uncertain', default_value='1',
+        'P_uncertain', default_value='1.0',
         description='P_uncertain',
     )
 
@@ -91,6 +95,7 @@ def generate_launch_description():
     ld.add_action(corner_refinement_arg)
     ld.add_action(P_uncertain_arg)
     ld.add_action(R_uncertain_arg)
+    ld.add_action(Q_uncertain_arg)
 
     ld.add_action(OpaqueFunction(function=launch_setup))
 
